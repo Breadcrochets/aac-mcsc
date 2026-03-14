@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AAC Board</title>
+<script type="application/json" id="board-data">null</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0a4a;font-family:Arial,Helvetica,sans-serif;}
+#app{display:flex;flex-direction:column;width:100%;height:100%;}
+
+/* ── Sentence bar ── */
+#sentence-bar{
+  display:flex;align-items:center;
+  background:#ffffff;border-bottom:2px solid #cccccc;
+  height:6.79%;min-height:40px;padding:0 6px;gap:6px;flex-shrink:0;
+}
+#sentence-text{
+  flex:1;color:#111;font-size:clamp(13px,2vh,22px);
+  padding:4px 6px;min-height:28px;display:flex;align-items:center;
+  gap:5px;flex-wrap:wrap;cursor:pointer;
+}
+.s-word{background:rgba(0,0,0,.08);border-radius:4px;padding:2px 7px;white-space:nowrap;}
+#delete-btn{
+  background:linear-gradient(135deg,#e53935,#b71c1c);color:white;border:none;
+  border-radius:6px;padding:6px 14px;font-size:clamp(12px,1.8vh,19px);
+  font-family:inherit;cursor:pointer;white-space:nowrap;flex-shrink:0;
+  box-shadow:0 2px 4px rgba(0,0,0,.4);
+}
+
+/* ── Menu bar ── */
+#menu-bar{
+  display:flex;align-items:center;
+  background:linear-gradient(135deg,#d4a843,#b8902a);
+  height:5.43%;min-height:34px;padding:0 10px;gap:8px;flex-shrink:0;
+}
+.menu-btn{
+  background:none;border:1.5px solid rgba(255,255,255,.5);color:white;
+  border-radius:5px;padding:4px 13px;font-size:clamp(11px,1.6vh,17px);
+  font-family:inherit;cursor:pointer;white-space:nowrap;flex-shrink:0;
+}
+#screen-title{
+  flex:1;text-align:center;color:white;font-weight:bold;
+  font-size:clamp(12px,1.8vh,20px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+
+/* ── Grid ── */
+#grid{
+  flex:1;display:grid;
+  grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(5,1fr);
+  gap:3px;padding:3px;background:#0a0a4a;overflow:hidden;
+}
+.cell{
+  border-radius:0;border:2px solid rgba(0,0,0,.25);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;position:relative;overflow:hidden;
+  user-select:none;-webkit-user-select:none;
+}
+.cell.empty{background:#0d0d5a;border-color:rgba(255,255,255,.08);}
+.cell.has-image{justify-content:flex-start;}
+.cell img{max-width:90%;flex:1;min-height:0;object-fit:contain;pointer-events:none;}
+.cell .lbl{
+  font-size:clamp(14px,2.2vh,25px);font-weight:bold;color:#111;
+  text-align:center;padding:3px 4px;line-height:1.15;
+  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  flex-shrink:0;
+}
+.cell.has-image .lbl{padding:4px 4px 2px;}
+
+/* ── Context menu ── */
+#ctx{
+  position:fixed;background:white;border:1px solid #bbb;border-radius:10px;
+  box-shadow:0 6px 20px rgba(0,0,0,.35);z-index:900;min-width:170px;
+  overflow:hidden;display:none;
+}
+#ctx button{
+  display:block;width:100%;padding:13px 18px;border:none;background:none;
+  text-align:left;font-size:16px;font-family:inherit;cursor:pointer;
+}
+#ctx button:hover{background:#f0f0f0;}
+#ctx hr{border:none;border-top:1px solid #eee;margin:0;}
+#ctx .danger{color:#cc2222;}
+
+/* ── Modal ── */
+#overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;
+  display:none;align-items:center;justify-content:center;
+}
+#modal{
+  background:white;border-radius:14px;padding:22px;
+  width:min(460px,92vw);max-height:90vh;overflow-y:auto;
+}
+#modal h2{margin-bottom:14px;font-size:19px;}
+#modal label{display:block;margin-bottom:3px;font-weight:bold;font-size:13px;color:#333;}
+#modal input[type=text]{
+  width:100%;padding:8px 10px;border:1.5px solid #ccc;border-radius:7px;
+  font-size:15px;font-family:inherit;margin-bottom:12px;
+}
+#modal .check-row{display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:15px;}
+#modal .check-row input{width:auto;margin:0;accent-color:#2255cc;}
+.swatches{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;}
+.swatch{
+  width:30px;height:30px;border-radius:5px;cursor:pointer;
+  border:2.5px solid transparent;outline:none;
+}
+.swatch.sel{border-color:#333;}
+#img-preview{width:100%;max-height:110px;object-fit:contain;margin-bottom:8px;display:none;border-radius:6px;}
+#inp-img{width:100%;font-size:14px;margin-bottom:14px;}
+.btn-row{display:flex;gap:8px;justify-content:flex-end;margin-top:6px;}
+.btn-row button{
+  padding:9px 20px;border-radius:7px;border:none;
+  font-size:15px;font-family:inherit;cursor:pointer;
+}
+.b-primary{background:#2255cc;color:white;}
+.b-danger{background:#cc2222;color:white;}
+.b-cancel{background:#e8e8e8;color:#333;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sentence-bar">
+    <div id="sentence-text"></div>
+    <button id="delete-btn">⌫ Delete</button>
+  </div>
+  <div id="menu-bar">
+    <button class="menu-btn" id="back-btn" style="visibility:hidden">◀ Back</button>
+    <span id="screen-title">Home</span>
+    <button class="menu-btn" id="export-btn">Export ↓</button>
+  </div>
+  <div id="grid"></div>
+</div>
+
+<div id="ctx">
+  <button id="c-new-btn">New Button</button>
+  <button id="c-new-folder">New Folder</button>
+  <hr id="c-hr">
+  <button id="c-edit">Edit</button>
+  <button id="c-del" class="danger">Delete</button>
+</div>
+
+<div id="overlay">
+  <div id="modal">
+    <h2 id="m-title">New Button</h2>
+    <label>Display Name</label>
+    <input type="text" id="m-name" placeholder="Label shown on button">
+    <label>Spoken Text <span style="font-weight:normal;color:#666">(blank = use display name)</span></label>
+    <input type="text" id="m-spoken" placeholder="What to speak when tapped">
+    <div id="m-folder-opts" style="display:none">
+      <div class="check-row">
+        <input type="checkbox" id="m-speak-open" checked>
+        <label for="m-speak-open" style="font-weight:normal;margin-bottom:0">Speak folder name when opened</label>
+      </div>
+    </div>
+    <label>Background Color</label>
+    <div class="swatches" id="m-swatches"></div>
+    <label>Image</label>
+    <img id="img-preview" alt="">
+    <input type="file" id="inp-img" accept="image/*">
+    <div class="btn-row">
+      <button class="b-cancel" id="m-cancel">Cancel</button>
+      <button class="b-primary" id="m-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const PALETTE = [
+  {color:null,   label:'White'},
+  {color:'#fff9c4',label:'Yellow'},
+  {color:'#c8e6c9',label:'Green'},
+  {color:'#ffcdd2',label:'Red'},
+  {color:'#ffe0b2',label:'Orange'},
+  {color:'#e1bee7',label:'Purple'},
+  {color:'#b3e5fc',label:'Blue'},
+  {color:'#f8bbd0',label:'Pink'},
+];
+
+const LONG_PRESS_MS = 600;
+const DBL_TAP_MS   = 320;
+
+// ── State ──────────────────────────────────────────────────────────────────
+let board        = null;   // {screens:{id:{name,buttons:[...]}}}
+let curScreen    = 'home';
+let history      = [];
+let sentence     = [];
+
+let pressEl      = null;
+let pressTimer   = null;
+let pressX       = 0, pressY = 0;
+let didMove      = false;
+
+let ctxPos       = null;   // {screenId,row,col}
+let editMeta     = null;   // {screenId,row,col,isNew,isFolder}
+let editImg      = null;
+
+let delTaps      = 0;
+let delTimer     = null;
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const clone = o => JSON.parse(JSON.stringify(o));
+
+function lighten(hex, amt) {
+  if (!hex) return '#ffffff';
+  const n = parseInt(hex.slice(1),16);
+  const r=Math.min(255,((n>>16)&0xff)+amt);
+  const g=Math.min(255,((n>>8)&0xff)+amt);
+  const b=Math.min(255,(n&0xff)+amt);
+  return '#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+
+function getBtn(screenId, row, col) {
+  return (board.screens[screenId]?.buttons||[]).find(b=>b.row===row&&b.col===col)||null;
+}
+
+// ── Speech ─────────────────────────────────────────────────────────────────
+function speak(txt) {
+  if (!txt||!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(txt);
+  u.rate = 0.9;
+  speechSynthesis.speak(u);
+}
+
+// ── Persist ────────────────────────────────────────────────────────────────
+function save() {
+  try { localStorage.setItem('aac_v1', JSON.stringify(board)); } catch(e) {}
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function render() {
+  const scr = board.screens[curScreen];
+  $('screen-title').textContent = scr.name;
+  $('back-btn').style.visibility = history.length ? 'visible' : 'hidden';
+  renderGrid(scr);
+  renderBar();
+}
+
+function renderGrid(scr) {
+  const grid = $('grid');
+  grid.innerHTML = '';
+  for (let r=0;r<5;r++) for (let c=0;c<5;c++) {
+    const btn = getBtn(curScreen, r, c);
+    grid.appendChild(makeCell(btn, r, c));
+  }
+}
+
+function makeCell(btn, row, col) {
+  const el = document.createElement('div');
+  el.className = 'cell' + (btn?'':' empty') + (btn?.isFolder?' folder':'') + (btn?.image?' has-image':'');
+  el.dataset.row = row; el.dataset.col = col;
+
+  if (btn) {
+    const bg = btn.bgColor || '#ffffff';
+    el.style.background = `linear-gradient(135deg,${lighten(bg,28)} 0%,${bg} 100%)`;
+
+    const lbl = document.createElement('div');
+    lbl.className = 'lbl';
+    lbl.textContent = btn.displayName;
+    el.appendChild(lbl);
+    if (btn.image) {
+      const img = document.createElement('img');
+      img.src = btn.image; img.draggable = false;
+      el.appendChild(img);
+    }
+  }
+
+  el.addEventListener('touchstart', onDown, {passive:true});
+  el.addEventListener('touchmove',  onMove, {passive:true});
+  el.addEventListener('touchend',   onUp);
+  el.addEventListener('mousedown',  onDown);
+  el.addEventListener('mousemove',  onMove);
+  el.addEventListener('mouseup',    onUp);
+  el.addEventListener('contextmenu', e=>e.preventDefault());
+  return el;
+}
+
+function renderBar() {
+  $('sentence-text').innerHTML = sentence.map(w=>`<span class="s-word">${w}</span>`).join(' ');
+}
+
+// ── Press events ────────────────────────────────────────────────────────────
+function coordFrom(e) {
+  return e.touches ? {x:e.touches[0].clientX, y:e.touches[0].clientY}
+                   : {x:e.clientX, y:e.clientY};
+}
+
+function onDown(e) {
+  if ((e.touches||[]).length > 1) return;
+  pressEl = e.currentTarget; didMove = false;
+  const {x,y} = coordFrom(e);
+  pressX = x; pressY = y;
+  pressTimer = setTimeout(() => {
+    openCtx(pressEl, pressX, pressY);
+    pressEl = null;
+  }, LONG_PRESS_MS);
+}
+
+function onMove(e) {
+  if (!pressEl) return;
+  const {x,y} = coordFrom(e);
+  if (Math.abs(x-pressX)>8 || Math.abs(y-pressY)>8) {
+    didMove = true; clearTimeout(pressTimer);
+  }
+}
+
+function onUp(e) {
+  clearTimeout(pressTimer);
+  if (pressEl && !didMove) activateCell(pressEl);
+  pressEl = null;
+}
+
+function activateCell(el) {
+  const row=+el.dataset.row, col=+el.dataset.col;
+  const btn = getBtn(curScreen, row, col);
+  if (!btn) return;
+
+  if (btn.isFolder) {
+    if (btn.speakOnOpen) speak(btn.spokenText || btn.displayName);
+    const target = btn.targetScreen;
+    if (target && board.screens[target]) {
+      if (target === 'home') { history=[]; curScreen='home'; }
+      else { history.push(curScreen); curScreen=target; }
+      render();
+    }
+  } else {
+    const txt = btn.spokenText || btn.displayName;
+    speak(txt);
+    sentence.push(btn.displayName);
+    renderBar();
+  }
+}
+
+// ── Context menu ────────────────────────────────────────────────────────────
+function openCtx(el, x, y) {
+  const row=+el.dataset.row, col=+el.dataset.col;
+  ctxPos = {screenId:curScreen, row, col};
+  const has = !!getBtn(curScreen, row, col);
+
+  $('c-new-btn').style.display    = has?'none':'block';
+  $('c-new-folder').style.display = has?'none':'block';
+  $('c-hr').style.display         = has?'block':'none';
+  $('c-edit').style.display       = has?'block':'none';
+  $('c-del').style.display        = has?'block':'none';
+
+  const m=$('ctx');
+  m.style.left = Math.min(x, innerWidth-185)+'px';
+  m.style.top  = Math.min(y, innerHeight-170)+'px';
+  m.style.display='block';
+}
+
+function closeCtx() { $('ctx').style.display='none'; }
+
+$('c-new-btn').onclick    = ()=>{ closeCtx(); openModal(false,false); };
+$('c-new-folder').onclick = ()=>{ closeCtx(); openModal(false,true);  };
+$('c-edit').onclick       = ()=>{ closeCtx(); openModal(true);        };
+$('c-del').onclick        = ()=>{
+  closeCtx();
+  const {screenId,row,col} = ctxPos;
+  const scr = board.screens[screenId];
+  const idx = scr.buttons.findIndex(b=>b.row===row&&b.col===col);
+  if (idx<0) return;
+  const b = scr.buttons[idx];
+  if (b.isFolder && b.targetScreen && b.targetScreen!=='home')
+    delete board.screens[b.targetScreen];
+  scr.buttons.splice(idx,1);
+  render(); save();
+};
+
+document.addEventListener('pointerdown', e=>{
+  if (!$('ctx').contains(e.target)) closeCtx();
+}, true);
+
+// ── Edit modal ──────────────────────────────────────────────────────────────
+function buildSwatches(selected) {
+  const row = $('m-swatches'); row.innerHTML='';
+  PALETTE.forEach(({color,label})=>{
+    const sw = document.createElement('div');
+    sw.className = 'swatch' + (color===selected?' sel':'');
+    sw.style.background = color||'#ffffff';
+    sw.style.border = color ? '2.5px solid rgba(0,0,0,.2)':'2.5px solid #aaa';
+    sw.dataset.color = color||'';
+    sw.title = label;
+    sw.addEventListener('click',()=>{
+      row.querySelectorAll('.swatch').forEach(s=>s.classList.remove('sel'));
+      sw.classList.add('sel');
+    });
+    row.appendChild(sw);
+  });
+}
+
+function openModal(editing, isFolder) {
+  editImg = null;
+  const scr = board.screens[ctxPos.screenId];
+  const existing = editing ? getBtn(ctxPos.screenId, ctxPos.row, ctxPos.col) : null;
+  if (editing) isFolder = existing?.isFolder;
+
+  editMeta = {...ctxPos, isNew:!editing, isFolder:!!isFolder};
+
+  $('m-title').textContent = editing?(isFolder?'Edit Folder':'Edit Button'):(isFolder?'New Folder':'New Button');
+  $('m-name').value   = existing?.displayName||'';
+  $('m-spoken').value = existing?.spokenText||'';
+  $('m-folder-opts').style.display = isFolder?'block':'none';
+  $('m-speak-open').checked = existing?.speakOnOpen!==false;
+
+  const prev=$('img-preview');
+  if (existing?.image) { prev.src=existing.image; prev.style.display='block'; editImg=existing.image; }
+  else { prev.style.display='none'; editImg=null; }
+
+  buildSwatches(existing?.bgColor||null);
+  $('inp-img').value='';
+  $('overlay').style.display='flex';
+  $('m-name').focus();
+}
+
+$('inp-img').addEventListener('change', e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=ev=>{
+    editImg=ev.target.result;
+    $('img-preview').src=editImg;
+    $('img-preview').style.display='block';
+  };
+  rd.readAsDataURL(f);
+});
+
+$('m-cancel').onclick = ()=>{ $('overlay').style.display='none'; };
+
+$('m-save').onclick = ()=>{
+  const name = $('m-name').value.trim();
+  if (!name) { alert('Please enter a display name.'); return; }
+  const spoken     = $('m-spoken').value.trim();
+  const swSel      = $('m-swatches').querySelector('.swatch.sel');
+  const bgColor    = swSel?.dataset.color || null;
+  const speakOnOpen= $('m-speak-open').checked;
+  const {screenId,row,col,isNew,isFolder} = editMeta;
+
+  const scr = board.screens[screenId];
+  // preserve existing targetScreen if editing a folder
+  const old = getBtn(screenId,row,col);
+  scr.buttons = (scr.buttons||[]).filter(b=>!(b.row===row&&b.col===col));
+
+  let targetScreen = null;
+  if (isFolder) {
+    targetScreen = (!isNew && old?.targetScreen) || ('s_'+Date.now());
+    if (!board.screens[targetScreen])
+      board.screens[targetScreen] = {name, buttons:[]};
+    else
+      board.screens[targetScreen].name = name;
+  }
+
+  scr.buttons.push({
+    row, col,
+    displayName: name,
+    spokenText:  spoken || name,
+    image:       editImg,
+    bgColor:     bgColor || '#ffffff',
+    isFolder:    !!isFolder,
+    targetScreen,
+    speakOnOpen,
+  });
+
+  $('overlay').style.display='none';
+  render(); save();
+};
+
+$('overlay').addEventListener('pointerdown', e=>{
+  if (e.target===$('overlay')) $('overlay').style.display='none';
+});
+
+// ── Sentence bar ────────────────────────────────────────────────────────────
+$('sentence-text').addEventListener('click', ()=>{
+  if (sentence.length) speak(sentence.join(' '));
+});
+
+$('delete-btn').addEventListener('click', e=>{
+  e.stopPropagation();
+  delTaps++;
+  if (delTaps===1) {
+    delTimer = setTimeout(()=>{
+      if (delTaps===1) { sentence.pop(); renderBar(); }
+      delTaps=0;
+    }, DBL_TAP_MS);
+  } else {
+    clearTimeout(delTimer); delTaps=0;
+    sentence=[]; renderBar();
+  }
+});
+
+// ── Nav buttons ─────────────────────────────────────────────────────────────
+$('back-btn').onclick = ()=>{
+  if (history.length) { curScreen=history.pop(); render(); }
+};
+
+// ── Export ──────────────────────────────────────────────────────────────────
+$('export-btn').onclick = ()=>{
+  const dataEl = $('board-data');
+  const orig   = dataEl.textContent;
+  dataEl.textContent = JSON.stringify(board).replace(/<\//g,'<\\/');
+  const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  dataEl.textContent = orig;
+
+  const blob = new Blob([html],{type:'text/html'});
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = 'aac_board_'+new Date().toISOString().slice(0,10)+'.html';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
+
+// ── Default board state ──────────────────────────────────────────────────────
+function defaultBoard() {
+  return {screens:{
+    home:{name:'Home', buttons:[
+      {row:0,col:0,displayName:'clear',    spokenText:'clear',     image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:0,col:1,displayName:'Help',     spokenText:'Help',      image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:0,col:2,displayName:'more',     spokenText:'more',      image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:0,col:3,displayName:'All done', spokenText:'All done',  image:null,bgColor:'#ef5350',isFolder:false,speakOnOpen:true},
+      {row:0,col:4,displayName:'GROUPS',   spokenText:'GROUPS',    image:null,bgColor:'#ffe0b2',isFolder:true, targetScreen:'groups',  speakOnOpen:false},
+      {row:2,col:3,displayName:'drink',    spokenText:'drink',     image:null,bgColor:'#c8e6c9',isFolder:true, targetScreen:'drink',   speakOnOpen:true},
+      {row:2,col:4,displayName:'eat',      spokenText:'eat',       image:null,bgColor:'#c8e6c9',isFolder:true, targetScreen:'eat',     speakOnOpen:true},
+      {row:3,col:0,displayName:'hello',    spokenText:'hello',     image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:3,col:3,displayName:'ACTIONS',  spokenText:'ACTIONS',   image:null,bgColor:'#c8e6c9',isFolder:true, targetScreen:'actions', speakOnOpen:false},
+      {row:3,col:4,displayName:'go',       spokenText:'go',        image:null,bgColor:'#c8e6c9',isFolder:false,speakOnOpen:true},
+      {row:4,col:1,displayName:'potty',    spokenText:'potty',     image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:4,col:4,displayName:'play',     spokenText:'play',      image:null,bgColor:'#c8e6c9',isFolder:true, targetScreen:'play',    speakOnOpen:true},
+    ]},
+    groups: {name:'GROUPS',    buttons:[]},
+    actions:{name:'ACTIONS',   buttons:[]},
+    drink:  {name:'Drinks',    buttons:[
+      {row:0,col:0,displayName:'clear',       spokenText:'clear',       image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:0,col:1,displayName:'FOOD GROUPS', spokenText:'FOOD GROUPS', image:null,bgColor:'#fff9c4',isFolder:true, targetScreen:'food_groups',speakOnOpen:false},
+      {row:1,col:3,displayName:'milk',        spokenText:'milk',        image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:2,col:1,displayName:'water',       spokenText:'water',       image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:2,col:2,displayName:'drink',       spokenText:'drink',       image:null,bgColor:'#c8e6c9',isFolder:false,speakOnOpen:true},
+      {row:3,col:1,displayName:'juice',       spokenText:'juice',       image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:4,col:0,displayName:'home',        spokenText:'home',        image:null,bgColor:'#fff9c4',isFolder:true, targetScreen:'home',       speakOnOpen:false},
+      {row:4,col:1,displayName:'MORE DRINKS', spokenText:'MORE DRINKS', image:null,bgColor:'#b3e5fc',isFolder:true, targetScreen:'more_drinks',speakOnOpen:false},
+    ]},
+    eat:    {name:'Eat',       buttons:[
+      {row:0,col:0,displayName:'clear',        spokenText:'clear',        image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:0,col:1,displayName:'FOOD GROUPS',  spokenText:'FOOD GROUPS',  image:null,bgColor:'#fff9c4',isFolder:true, targetScreen:'food_groups',speakOnOpen:false},
+      {row:0,col:2,displayName:'more',         spokenText:'more',         image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:0,col:3,displayName:'ice cream cone',spokenText:'ice cream cone',image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:1,col:0,displayName:'roti',         spokenText:'roti',         image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:1,col:1,displayName:'cheez its',    spokenText:'cheez its',    image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:1,col:2,displayName:'Cheerios',     spokenText:'Cheerios',     image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:1,col:3,displayName:'Rice',         spokenText:'Rice',         image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:1,col:4,displayName:'noodles',      spokenText:'noodles',      image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:2,col:1,displayName:'cookies',      spokenText:'cookies',      image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:2,col:3,displayName:'eat',          spokenText:'eat',          image:null,bgColor:'#c8e6c9',isFolder:false,speakOnOpen:true},
+      {row:2,col:4,displayName:'nuts',         spokenText:'nuts',         image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:3,col:0,displayName:'chips',        spokenText:'chips',        image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:3,col:2,displayName:'pear',         spokenText:'pear',         image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:3,col:3,displayName:'goldfish',     spokenText:'goldfish',     image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:4,col:0,displayName:'home',         spokenText:'home',         image:null,bgColor:'#fff9c4',isFolder:true, targetScreen:'home',       speakOnOpen:false},
+      {row:4,col:1,displayName:'MORE SNACKS',  spokenText:'MORE SNACKS',  image:null,bgColor:'#b3e5fc',isFolder:true, targetScreen:'more_snacks',speakOnOpen:false},
+      {row:4,col:4,displayName:'crackers',     spokenText:'crackers',     image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+    ]},
+    play:   {name:'Play',      buttons:[
+      {row:0,col:0,displayName:'clear',           spokenText:'clear',           image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:0,col:1,displayName:'toy',             spokenText:'toy',             image:null,bgColor:'#f8bbd0',isFolder:false,speakOnOpen:true},
+      {row:0,col:2,displayName:'magnetiles',      spokenText:'magnetiles',      image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:0,col:3,displayName:'swing',           spokenText:'swing',           image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:0,col:4,displayName:'book',            spokenText:'book',            image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:1,col:0,displayName:'paw patrol book', spokenText:'paw patrol book', image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:1,col:1,displayName:'iPad',            spokenText:'iPad',            image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:1,col:2,displayName:'animal book',     spokenText:'animal book',     image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:1,col:3,displayName:'bugs',            spokenText:'bugs',            image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:1,col:4,displayName:'potty book',      spokenText:'potty book',      image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:2,col:0,displayName:'steering wheel',  spokenText:'steering wheel',  image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:2,col:1,displayName:'ball',            spokenText:'ball',            image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:2,col:3,displayName:'bubbles',         spokenText:'bubbles',         image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:2,col:4,displayName:'COLORS',          spokenText:'COLORS',          image:null,bgColor:'#fff9c4',isFolder:true, targetScreen:'colors',    speakOnOpen:false},
+      {row:3,col:0,displayName:'cars',            spokenText:'cars',            image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:3,col:2,displayName:'Water mat',       spokenText:'Water mat',       image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:3,col:3,displayName:'Mickey Mouse book',spokenText:'Mickey Mouse book',image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:3,col:4,displayName:'play',            spokenText:'play',            image:null,bgColor:'#c8e6c9',isFolder:false,speakOnOpen:true},
+      {row:4,col:0,displayName:'home',            spokenText:'home',            image:null,bgColor:'#fff9c4',isFolder:true, targetScreen:'home',      speakOnOpen:false},
+      {row:4,col:1,displayName:'MORE TOYS',       spokenText:'MORE TOYS',       image:null,bgColor:'#b3e5fc',isFolder:true, targetScreen:'more_toys', speakOnOpen:false},
+      {row:4,col:2,displayName:'puzzle',          spokenText:'puzzle',          image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:4,col:3,displayName:'ABC book',        spokenText:'ABC book',        image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+      {row:4,col:4,displayName:'Legos',           spokenText:'Legos',           image:null,bgColor:'#ffffff',isFolder:false,speakOnOpen:true},
+    ]},
+    food_groups: {name:'Food Groups', buttons:[]},
+    more_drinks: {name:'More Drinks', buttons:[]},
+    more_snacks: {name:'More Snacks', buttons:[]},
+    more_toys:   {name:'More Toys',   buttons:[]},
+    colors:      {name:'COLORS',      buttons:[]},
+  }};
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+(function init() {
+  const embedded = JSON.parse($('board-data').textContent);
+  if (embedded) {
+    board = embedded;
+  } else {
+    try {
+      const ls = localStorage.getItem('aac_v1');
+      if (ls) { board=JSON.parse(ls); return; }
+    } catch(e) {}
+    board = defaultBoard();
+  }
+})();
+
+render();
+</script>
+</body>
+</html>
